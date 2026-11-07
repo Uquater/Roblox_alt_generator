@@ -1,0 +1,6 @@
+accounts.txt
+accounts_cookies.txt
+.env
+*.log
+__pycache__/
+*.pyc
