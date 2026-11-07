@@ -212,9 +212,18 @@ def main():
                 cookie_file = args.output.replace(".txt", "_cookies.txt")
                 if cookie:
                     with open(cookie_file, "a") as f:
-                        f.write(f"{username}:{cookie}\n")
+                        f.write(f"{username}:{password}:{cookie}\n")
+
+                # Format untuk bulk import (cookie only, 1 per line)
+                bulk_file = args.output.replace(".txt", "_bulk.txt")
+                if cookie:
+                    with open(bulk_file, "a") as f:
+                        f.write(f"{cookie}\n")
 
                 print(f"  tersimpan ke {args.output}")
+                if cookie:
+                    print(f"  cookie tersimpan ke {cookie_file}")
+                    print(f"  bulk import tersimpan ke {bulk_file}")
 
                 driver.delete_all_cookies()
             else:
