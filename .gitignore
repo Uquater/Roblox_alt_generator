@@ -1,5 +1,6 @@
 accounts.txt
 accounts_cookies.txt
+accounts_bulk.txt
 .env
 *.log
 __pycache__/
