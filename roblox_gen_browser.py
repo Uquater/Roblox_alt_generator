@@ -10,7 +10,7 @@ import argparse
 import json
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
@@ -90,49 +90,58 @@ def fill_signup(driver, username, password):
     wait.until(EC.presence_of_element_located((By.ID, "MonthDropdown")))
     time.sleep(1)
 
-    # Month dropdown: coba beberapa format value (string, padded, text)
-    driver.execute_script("""
-        var el = document.getElementById('MonthDropdown');
-        if (!el) return;
-        var val = arguments[0];
-        // cari option yang cocok by value atau by index
-        for (var i = 0; i < el.options.length; i++) {
-            var opt = el.options[i];
-            if (opt.value == val || opt.value == String(val).padStart(2,'0') || i == val) {
-                el.selectedIndex = i;
-                el.dispatchEvent(new Event('change', {bubbles: true}));
-                // React synthetic event trigger
-                var tracker = el._valueTracker;
-                if (tracker) tracker.setValue('');
-                el.dispatchEvent(new Event('input', {bubbles: true}));
-                el.dispatchEvent(new Event('change', {bubbles: true}));
-                break;
-            }
-        }
-    """, month)
-    time.sleep(0.5)
-    set_select_value(driver, "#DayDropdown", str(day))
-    time.sleep(0.5)
-    set_select_value(driver, "#YearDropdown", str(year))
-    time.sleep(0.5)
+    # 1. Pilih Month, Day, Year menggunakan Selenium Select resmi
+    # Roblox menggunakan nilai Day 2 digit ('01', '02', dst) dan value Month berupa singkatan ('Jan', 'Feb', dst)
+    month_dropdown = Select(driver.find_element(By.ID, "MonthDropdown"))
+    month_dropdown.select_by_index(month)
+    time.sleep(0.3)
 
-    print(f"  birthday: {month}/{day}/{year}")
+    day_dropdown = Select(driver.find_element(By.ID, "DayDropdown"))
+    day_dropdown.select_by_value(f"{day:02d}")
+    time.sleep(0.3)
 
-    set_input_value(driver, "#signup-username", username)
-    time.sleep(0.5)
-    set_input_value(driver, "#signup-password", password)
-    time.sleep(0.5)
+    year_dropdown = Select(driver.find_element(By.ID, "YearDropdown"))
+    year_dropdown.select_by_value(str(year))
+    time.sleep(0.3)
 
-    gender = random.choice(["MaleButton", "FemaleButton"])
-    driver.execute_script(f"document.getElementById('{gender}')?.click()")
+    print(f"  birthday: {month:02d}/{day:02d}/{year}")
+
+    # 2. Isi Username
+    try:
+        user_input = driver.find_element(By.ID, "signup-username")
+        user_input.clear()
+        user_input.send_keys(username)
+    except Exception:
+        set_input_value(driver, "#signup-username", username)
+    time.sleep(0.4)
+
+    # 3. Isi Password
+    try:
+        pass_input = driver.find_element(By.ID, "signup-password")
+        pass_input.clear()
+        pass_input.send_keys(password)
+    except Exception:
+        set_input_value(driver, "#signup-password", password)
+    time.sleep(0.4)
+
+    # 4. Gender
+    gender_id = random.choice(["MaleButton", "FemaleButton"])
+    try:
+        driver.find_element(By.ID, gender_id).click()
+    except Exception:
+        driver.execute_script(f"document.getElementById('{gender_id}')?.click()")
     time.sleep(0.3)
 
 
 def click_signup(driver):
-    driver.execute_script("""
-        var btn = document.getElementById('signup-button');
-        if (btn) { btn.disabled = false; btn.click(); }
-    """)
+    try:
+        btn = driver.find_element(By.ID, "signup-button")
+        driver.execute_script("arguments[0].disabled = false; arguments[0].click();", btn)
+    except Exception:
+        driver.execute_script("""
+            var btn = document.getElementById('signup-button');
+            if (btn) { btn.disabled = false; btn.click(); }
+        """)
 
 
 def wait_for_captcha_and_success(driver, timeout=300):
@@ -143,6 +152,7 @@ def wait_for_captcha_and_success(driver, timeout=300):
     print("  ====================================\n")
 
     start = time.time()
+    last_error = ""
     while time.time() - start < timeout:
         url = driver.current_url
         if "/home" in url or "/discover" in url or "/charts" in url:
@@ -151,8 +161,9 @@ def wait_for_captcha_and_success(driver, timeout=300):
             error_el = driver.find_elements(By.CSS_SELECTOR, ".alert-warning, .status-error, [class*='error']")
             for el in error_el:
                 txt = el.text.strip()
-                if txt and "captcha" not in txt.lower():
+                if txt and "captcha" not in txt.lower() and txt != last_error:
                     print(f"  error dari roblox: {txt}")
+                    last_error = txt
         except Exception:
             pass
         time.sleep(2)
